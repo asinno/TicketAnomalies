@@ -1,5 +1,4 @@
 #Trust all certs
-
 Add-Type -TypeDefinition @'
     using System.Net;
     using System.Security.Cryptography.X509Certificates;
@@ -13,8 +12,8 @@ Add-Type -TypeDefinition @'
 '@
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
+
 #Send UDP Datagram By PeteGoo https://gist.github.com/PeteGoo/21a5ab7636786670e47c
 function Send-UdpDatagram
 {
@@ -39,7 +38,6 @@ $TicketCount = 0
 $DateTimeFormat = "M/d/yyyy H:mm:ss"
 $TimeCounter = 0
 $SuspiciousTicket = @()
-
 
 
 #Attempts to match all times in klist and dumps them into a psobject for collection
