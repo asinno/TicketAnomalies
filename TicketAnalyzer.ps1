@@ -1,3 +1,20 @@
+#Trust all certs
+
+Add-Type -TypeDefinition @'
+    using System.Net;
+    using System.Security.Cryptography.X509Certificates;
+    public class TrustAllCertsPolicy : ICertificatePolicy {
+        public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+        }
+    }
+'@
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
 #Send UDP Datagram By PeteGoo https://gist.github.com/PeteGoo/21a5ab7636786670e47c
 function Send-UdpDatagram
 {
@@ -14,12 +31,16 @@ function Send-UdpDatagram
       $Socket.Close() 
 } 
 
+#Declare Variables
 $LIST = klist
 $TimeMatches=@()
 $Regex = '\d\/(\d{1}|\d{2})\/(\d){4} \d.*\d'
 $TicketCount = 0
 $DateTimeFormat = "M/d/yyyy H:mm:ss"
 $TimeCounter = 0
+$SuspiciousTicket = @()
+
+
 
 #Attempts to match all times in klist and dumps them into a psobject for collection
 foreach($Line in $LIST | Select-String  -Pattern '(Start Time)|(End Time)') {
@@ -28,12 +49,24 @@ foreach($Line in $LIST | Select-String  -Pattern '(Start Time)|(End Time)') {
   $TimeMatches += $StartDateTime
   $TicketCount++
 }
-#Iterates through all times of all TGTs to detect tickets with expiration times greater than 10 hours
+#Iterates through all times of all Tickets to detect tickets with expiration times greater than 10 hours
 for($TicketCount -gt 0; $TimeCounter -lt $TicketCount; $TimeCounter+=2){
   $TimeDifference = New-TimeSpan $TimeMatches[$TimeCounter] $TimeMatches[$TimeCounter+1]
   if($TimeDifference.TotalHours -gt 10){
-    $Message = Write-Host "Warning suspicious TGT detection on" $env:computername -ForegroundColor Red
-    Send-UdpDatagram -EndPoint 'Endpoint' -Port 'Port' -Message $Message
-  }
+    #Creates object to store ticket and device properties to be sent over UDP or any other protocol the user would like.
+    $SuspiciousTicket += New-Object -TypeName psobject -Property @{
+      'Title' = "Warning suspicious ticket detection on $env:computername";
+      'Date' = Get-Date (Get-Date).ToUniversalTime() -UFormat %s
+      'Hostname' = "$env:computername";
+      'FQDN'= "$env:computername.$env:userdnsdomain";
+      'Description' = 'This alert has detected a suspicious ticket on an endpoint. It works by checking if the expiration time of a ticket is greater than 10-hours. This typically indicates the presence of a golden ticket or silver ticket.';
+      'klist'= klist;
+    }
+    #Send data over UDP, must specific endpoint and port
+    #Send-UdpDatagram -EndPoint 'Endpoint' -Port 'Port' -Message $SuspiciousTicket | ConvertTo-Json
+    #Send to Splunk
+    $Headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+    $Headers.Add("Authorization", 'Splunk SPLUNK HEC TOKEN')
+    Invoke-RestMethod -Uri https://"YourSplunkIP":8088/services/collector/event -Method Post -Headers $Headers -Body $SuspiciousTicket | ConvertTo-Json
   $TimeDifference
 }
