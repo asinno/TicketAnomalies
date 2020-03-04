@@ -10,7 +10,6 @@ Add-Type -TypeDefinition @'
         }
     }
 '@
-
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
 
@@ -39,7 +38,6 @@ $DateTimeFormat = "M/d/yyyy H:mm:ss"
 $TimeCounter = 0
 $SuspiciousTicket = @()
 
-
 #Attempts to match all times in klist and dumps them into a psobject for collection
 foreach($Line in $LIST | Select-String  -Pattern '(Start Time)|(End Time)') {
   $Line -match $Regex
@@ -52,19 +50,23 @@ for($TicketCount -gt 0; $TimeCounter -lt $TicketCount; $TimeCounter+=2){
   $TimeDifference = New-TimeSpan $TimeMatches[$TimeCounter] $TimeMatches[$TimeCounter+1]
   if($TimeDifference.TotalHours -gt 10){
     #Creates object to store ticket and device properties to be sent over UDP or any other protocol the user would like.
-    $SuspiciousTicket += New-Object -TypeName psobject -Property @{
-      'Title' = "Warning suspicious ticket detection on $env:computername";
-      'Date' = Get-Date (Get-Date).ToUniversalTime() -UFormat %s
-      'Hostname' = "$env:computername";
-      'FQDN'= "$env:computername.$env:userdnsdomain";
-      'Description' = 'This alert has detected a suspicious ticket on an endpoint. It works by checking if the expiration time of a ticket is greater than 10-hours. This typically indicates the presence of a golden ticket or silver ticket.';
-      'klist'= klist;
-    }
+    $SuspiciousTicket = ConvertTo-Json -InputObject @{ 
+      host= "$env:COMPUTERNAME";
+      source="PowerShell Suspicious Ticket Finder";
+      sourcetype="PowerShell Scripts";
+      event = @{
+      timestamp= "{0:MM/dd/yyyy hh:mm:sstt zzz}" -f (Get-Date);
+      FQDN= "$env:computername.$env:userdnsdomain";
+      klist= klist;
+      Description = 'This alert has detected a suspicious ticket on an endpoint. It works by checking if the expiration time of a ticket is greater than 10-hours. This typically indicates the presence of a golden ticket or silver ticket.';
+      }
+    } -Compress
     #Send data over UDP, must specific endpoint and port
     #Send-UdpDatagram -EndPoint 'Endpoint' -Port 'Port' -Message $SuspiciousTicket | ConvertTo-Json
     #Send to Splunk
     $Headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $Headers.Add("Authorization", 'Splunk SPLUNK HEC TOKEN')
-    Invoke-RestMethod -Uri https://"YourSplunkIP":8088/services/collector/event -Method Post -Headers $Headers -Body $SuspiciousTicket | ConvertTo-Json
-  $TimeDifference
+    $Headers.Add("Authorization", 'Splunk YOUR HEC TOKEN')
+    #$Message = $SuspiciousTicket | ConvertTo-Json
+    $SplunkServer = "https://YOURSPLUNK:8088/services/collector/event"
+    Invoke-RestMethod -Uri $splunkserver -Method Post -Headers $headers -Body $SuspiciousTicket
 }
