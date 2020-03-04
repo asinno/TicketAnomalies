@@ -71,3 +71,4 @@ for($TicketCount -gt 0; $TimeCounter -lt $TicketCount; $TimeCounter+=2){
     $SplunkServer = "https://SPLUNK:8088/services/collector/event"
     Invoke-RestMethod -Uri $splunkserver -Method Post -Headers $headers -Body $SuspiciousTicket
 }
+}
