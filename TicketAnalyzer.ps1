@@ -55,6 +55,7 @@ for($TicketCount -gt 0; $TimeCounter -lt $TicketCount; $TimeCounter+=2){
       source="PowerShell Suspicious Ticket Finder";
       sourcetype="PowerShell Scripts";
       event = @{
+      Title="Suspicious ticket on $env:COMPUTERNAME";
       timestamp= "{0:MM/dd/yyyy hh:mm:sstt zzz}" -f (Get-Date);
       FQDN= "$env:computername.$env:userdnsdomain";
       klist= klist;
@@ -65,8 +66,8 @@ for($TicketCount -gt 0; $TimeCounter -lt $TicketCount; $TimeCounter+=2){
     #Send-UdpDatagram -EndPoint 'Endpoint' -Port 'Port' -Message $SuspiciousTicket | ConvertTo-Json
     #Send to Splunk
     $Headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $Headers.Add("Authorization", 'Splunk YOUR HEC TOKEN')
+    $Headers.Add("Authorization", 'Splunk HEC TOKEN')
     #$Message = $SuspiciousTicket | ConvertTo-Json
-    $SplunkServer = "https://YOURSPLUNK:8088/services/collector/event"
+    $SplunkServer = "https://SPLUNK:8088/services/collector/event"
     Invoke-RestMethod -Uri $splunkserver -Method Post -Headers $headers -Body $SuspiciousTicket
 }
